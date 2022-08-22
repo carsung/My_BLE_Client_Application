@@ -3,6 +3,9 @@ package example.mqtt.mybleserverapplication;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -12,8 +15,11 @@ import com.google.android.material.snackbar.Snackbar;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 
+import androidx.core.app.ActivityCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
@@ -25,11 +31,68 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "CSH_BLE";
 
     private static final int REQUEST_ENABLE_BT = 100;
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
+
+    private boolean scanning;
+    private Handler handler = new Handler();
+
+    private static final long SCAN_PERIOD = 30000;
+
+    private ScanCallback leScanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            super.onScanResult(callbackType, result);
+            Log.i(TAG, "onScanResult, " + result);
+        }
+
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            super.onBatchScanResults(results);
+            Log.i(TAG, "onBatchScanResults()");
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            super.onScanFailed(errorCode);
+            Log.i(TAG, "onScanFailed()");
+        }
+    };
+
+    private void scanLeDevice() {
+        BluetoothManager bluetoothManager = getSystemService(BluetoothManager.class);
+        BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+        BluetoothLeScanner bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+        Log.i(TAG, "BluetoothLeScanner = " + bluetoothLeScanner);
+        if (!scanning) {
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    scanning = false;
+                    if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, 1100);
+                    }
+                    bluetoothLeScanner.stopScan(leScanCallback);
+                }
+            }, SCAN_PERIOD);
+
+            scanning = true;
+            Log.i(TAG, "startScan()");
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, 1100);
+            }
+            bluetoothLeScanner.startScan(leScanCallback);
+        } else {
+            scanning = false;
+            bluetoothLeScanner.stopScan(leScanCallback);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +124,7 @@ public class MainActivity extends AppCompatActivity {
 
         BluetoothManager bluetoothManager = getSystemService(BluetoothManager.class);
         BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+
         if (bluetoothAdapter == null) {
             Toast.makeText(this, "The Device is not support Bluetooth", Toast.LENGTH_LONG).show();
         }
@@ -69,7 +133,11 @@ public class MainActivity extends AppCompatActivity {
 //            Toast.makeText(this, "Bluetooth is not enabled!", Toast.LENGTH_LONG).show();
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        } else {
+            Toast.makeText(this, "Scanning BLE Devices!", Toast.LENGTH_LONG).show();
+            scanLeDevice();
         }
+
     }
 
     @Override
@@ -81,7 +149,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_ENABLE_BT) {
-            Toast.makeText(this, "Bluetooth was turned on", Toast.LENGTH_LONG).show();
+            if (requestCode == RESULT_OK) {
+                Toast.makeText(this, "Bluetooth was turned on, start scanning...", Toast.LENGTH_LONG).show();
+                scanLeDevice();
+            }
         }
     }
 
