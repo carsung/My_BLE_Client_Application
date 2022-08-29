@@ -2,6 +2,8 @@ package example.mqtt.mybleserverapplication;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -17,6 +19,10 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 public class DeviceControlActivity extends Activity {
     private static final String TAG = "CSH_BLE";
 
@@ -29,7 +35,8 @@ public class DeviceControlActivity extends Activity {
     private String mDeviceAddress;
     private ExpandableListView mGattServiceList;
     private BluetoothLeService mBluetoothLeService;
-
+    private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics =
+            new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
     private boolean mConnected = false;
 
     private final String LIST_NAME = "NAME";
@@ -65,7 +72,7 @@ public class DeviceControlActivity extends Activity {
                 updateConnectionState(R.string.disconnected);
                 clearUi();
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
-
+                displayGattServices(mBluetoothLeService.getSupportedGattServices());
             }
         }
     };
@@ -120,6 +127,57 @@ public class DeviceControlActivity extends Activity {
                 mConnectionState.setText(resId);
             }
         });
+    }
+
+    private void displayGattServices(List<BluetoothGattService> gattServices) {
+        if (gattServices == null) return;
+        String uuid = null;
+        String unknownServiceString = getResources().getString(R.string.unknown_service);
+        String unknownCharaString = getResources().getString(R.string.unknown_characteristic);
+        ArrayList<HashMap<String, String>> gattServiceData = new ArrayList<HashMap<String, String>>();
+        ArrayList<ArrayList<HashMap<String, String>>> gatCharacteristicData
+                = new ArrayList<ArrayList<HashMap<String, String>>>();
+        mGattCharacteristics = new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
+
+        for (BluetoothGattService gattService : gattServices) {
+            HashMap<String , String> currentServiceData = new HashMap<String, String>();
+            uuid = gattService.getUuid().toString();
+            currentServiceData.put(LIST_NAME, SampleGattAttributes.lookup(uuid, unknownServiceString));
+            currentServiceData.put(LIST_UUID, uuid);
+            gattServiceData.add(currentServiceData);
+
+            ArrayList<HashMap<String, String>> gattCharacteristicGroupData =
+                    new ArrayList<HashMap<String, String>>();
+            List<BluetoothGattCharacteristic> gattCharacteristics =
+                    gattService.getCharacteristics();
+            ArrayList<BluetoothGattCharacteristic> charas =
+                    new ArrayList<BluetoothGattCharacteristic>();
+
+            for (BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics) {
+                charas.add(gattCharacteristic);
+                HashMap<String, String> currentCharData = new HashMap<String, String>();
+                uuid = gattCharacteristic.getUuid().toString();
+                currentCharData.put(
+                        LIST_NAME, SampleGattAttributes.lookup(uuid, unknownCharaString));
+                currentCharData.put(LIST_UUID, uuid);
+                gattCharacteristicGroupData.add(currentCharData);
+            }
+            mGattCharacteristics.add(charas);
+            gatCharacteristicData.add(gattCharacteristicGroupData);
+
+            SimpleExpandableListAdapter gattServiceAdapter = new SimpleExpandableListAdapter(
+                    this,
+                    gattServiceData,
+                    android.R.layout.simple_expandable_list_item_2,
+                    new String[] {LIST_NAME, LIST_UUID},
+                    new int[] { android.R.id.text1, android.R.id.text2},
+                    gatCharacteristicData,
+                    android.R.layout.simple_expandable_list_item_2,
+                    new String[] {LIST_NAME, LIST_UUID},
+                    new int[] {android.R.id.text1, android.R.id.text2}
+            );
+            mGattServiceList.setAdapter(gattServiceAdapter);
+        }
     }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
