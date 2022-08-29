@@ -12,20 +12,14 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
-import com.google.android.material.snackbar.Snackbar;
-
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
-import androidx.navigation.ui.NavigationUI;
 
 import example.mqtt.mybleserverapplication.databinding.ActivityMainBinding;
 
@@ -33,6 +27,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -58,7 +53,7 @@ public class MainActivity extends ListActivity {
         public void onScanResult(int callbackType, ScanResult result) {
             super.onScanResult(callbackType, result);
 //            Log.i(TAG, "onScanResult, " + result);
-            Log.i(TAG, "onScanResult, device = " +result.getDevice().getName());
+//            Log.i(TAG, "onScanResult, devicece = " +result.getDevice().getName());
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -175,6 +170,16 @@ public class MainActivity extends ListActivity {
     }
 
     @Override
+    protected void onListItemClick(ListView l, View v, int position, long id) {
+        final BluetoothDevice device = mLeDeviceAdapter.getDevice(position);
+        if (device == null) return;
+        final Intent intent = new Intent(this, DeviceControlActivity.class);
+        intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
+        intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
+        startActivity(intent);
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_main, menu);
@@ -261,7 +266,7 @@ public class MainActivity extends ListActivity {
             if (deviceName != null && deviceName.length() > 0) {
                 viewHolder.deviceName.setText(deviceName);
             } else {
-                viewHolder.deviceName.setText(R.string.unkown_devioce);
+                viewHolder.deviceName.setText(R.string.unknown_device);
             }
             viewHolder.deviceAddress.setText(device.getAddress());
 
